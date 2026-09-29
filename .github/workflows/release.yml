@@ -88,6 +88,35 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-build.txt
 
+      - name: Install Linux Qt runtime dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libegl1 \
+            libgl1 \
+            libopengl0 \
+            libxkbcommon0 \
+            libxkbcommon-x11-0 \
+            libxcb-cursor0 \
+            libxcb-icccm4 \
+            libxcb-image0 \
+            libxcb-keysyms1 \
+            libxcb-randr0 \
+            libxcb-render-util0 \
+            libxcb-shape0 \
+            libxcb-shm0 \
+            libxcb-sync1 \
+            libxcb-xfixes0 \
+            libxcb1 \
+            libx11-6 \
+            libx11-xcb1 \
+            libxrender1 \
+            libxext6 \
+            libfontconfig1 \
+            libfreetype6 \
+            libdbus-1-3
+
       - name: Inject release version
         shell: bash
         run: |
@@ -99,10 +128,12 @@ jobs:
 
       - name: Verify source
         shell: bash
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: |
           set -euo pipefail
           python -m compileall -q pwrtchmatcher pwr_tch_matcher_entry.py
-          python -c "from pwrtchmatcher.app import main; print('Import smoke: PASS')"
+          python -c "from pwrtchmatcher.app import main; from pwrtchmatcher.window import MainWindow; print('Import smoke: PASS')"
 
       - name: Build Nuitka onefile
         shell: bash
