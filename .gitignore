@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+dist/
+build/
+release/
+*.dist/
+*.onefile-build/
+*.build/
+*.write-part
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

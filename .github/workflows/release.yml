@@ -1,0 +1,247 @@
+name: Build & Release (multi-platform)
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (e.g. v0.1.0)"
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  PYTHON_VERSION: "3.10"
+  APP_SLUG: "pwr-tch-matcher"
+  ENTRYPOINT: "pwr_tch_matcher_entry.py"
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: win-x64
+            runner: windows-2022
+            ext: ".exe"
+            arch: x64
+            rosetta: false
+          - target: linux-x64
+            runner: ubuntu-24.04
+            ext: ""
+            arch: x64
+            rosetta: false
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+            ext: ""
+            arch: arm64
+            rosetta: false
+          - target: macos-x64
+            runner: macos-14
+            ext: ""
+            arch: x64
+            rosetta: true
+          - target: macos-arm64
+            runner: macos-14
+            ext: ""
+            arch: arm64
+            rosetta: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.tag) || github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          architecture: ${{ matrix.arch }}
+
+      - name: Ensure Rosetta
+        if: runner.os == 'macOS' && matrix.rosetta == true
+        shell: bash
+        run: |
+          set -euxo pipefail
+          /usr/sbin/softwareupdate --install-rosetta --agree-to-license
+
+      - name: Resolve tag and version
+        shell: bash
+        run: |
+          set -euxo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+
+          case "$TAG" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "Invalid tag: $TAG"; exit 1 ;;
+          esac
+
+          VERSION="${TAG#v}"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Inject version into source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python scripts/inject_version.py "$VERSION"
+
+      - name: Verify Python package
+        shell: bash
+        run: |
+          set -euxo pipefail
+          if [ "${{ runner.os }}" = "macOS" ] && [ "${{ matrix.rosetta }}" = "true" ]; then
+            arch -x86_64 python -m pip install --upgrade pip
+            arch -x86_64 python -m pip install -r requirements-build.txt
+            arch -x86_64 python -m compileall -q pwrtchmatcher pwr_tch_matcher_entry.py
+          else
+            python -m pip install --upgrade pip
+            python -m pip install -r requirements-build.txt
+            python -m compileall -q pwrtchmatcher pwr_tch_matcher_entry.py
+          fi
+
+      - name: Build Nuitka onefile
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p dist release
+
+          OUTPUT="${APP_SLUG}-${{ matrix.target }}${{ matrix.ext }}"
+
+          if [ "${{ runner.os }}" = "macOS" ] && [ "${{ matrix.rosetta }}" = "true" ]; then
+            arch -x86_64 python -m nuitka \
+              --mode=onefile \
+              --enable-plugin=pyside6 \
+              --assume-yes-for-downloads \
+              --follow-imports \
+              --include-package=pwrtchmatcher \
+              --include-package=polars \
+              --output-dir=dist \
+              --output-filename="$OUTPUT" \
+              "$ENTRYPOINT"
+          else
+            python -m nuitka \
+              --mode=onefile \
+              --enable-plugin=pyside6 \
+              --assume-yes-for-downloads \
+              --follow-imports \
+              --include-package=pwrtchmatcher \
+              --include-package=polars \
+              --output-dir=dist \
+              --output-filename="$OUTPUT" \
+              "$ENTRYPOINT"
+          fi
+
+      - name: Verify binary
+        shell: bash
+        run: |
+          set -euxo pipefail
+          BIN="dist/${APP_SLUG}-${{ matrix.target }}${{ matrix.ext }}"
+          test -f "$BIN"
+          cp "$BIN" "release/${APP_SLUG}-${{ matrix.target }}${{ matrix.ext }}"
+          cp "$BIN" "release/${APP_SLUG}-${TAG}-${{ matrix.target }}${{ matrix.ext }}"
+          if [ -z "${{ matrix.ext }}" ]; then
+            chmod +x "release/${APP_SLUG}-${{ matrix.target }}"
+            chmod +x "release/${APP_SLUG}-${TAG}-${{ matrix.target }}"
+          fi
+
+      - name: Create checksums
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python scripts/make_checksums.py "${{ matrix.target }}" release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pwr-tch-matcher-${{ matrix.target }}
+          path: release/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: Resolve tag
+        shell: bash
+        run: |
+          set -euxo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.TAG }}
+          make_latest: true
+          generate_release_notes: true
+          files: release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sync-main-version:
+    name: Sync version to main
+    needs: publish
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Update version files
+        shell: bash
+        run: |
+          set -euxo pipefail
+          VERSION="${GITHUB_REF#refs/tags/}"
+          python scripts/inject_version.py "${VERSION#v}"
+
+      - name: Commit and push
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION pwrtchmatcher/version.py pyproject.toml
+          if git diff --cached --quiet; then
+            echo "No version changes to commit."
+            exit 0
+          fi
+          git commit -m "chore: bump version to ${GITHUB_REF#refs/tags/}"
+          git push origin main

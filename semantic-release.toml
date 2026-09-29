@@ -1,0 +1,8 @@
+[tool.semantic_release]
+version_variables = [
+  "pwrtchmatcher/version.py:__version__",
+  "pyproject.toml:project.version",
+]
+tag_format = "v{version}"
+commit_message = "chore(release): v{version}"
+build_command = ""
