@@ -293,9 +293,7 @@ class ReviewPage(QWidget):
         diagram = AnimatedFlowWidget()
         root.addWidget(diagram, alignment=Qt.AlignmentFlag.AlignHCenter)
 
-        self.rule = QLabel(
-            "Same site  •  Fault time must be inside the PWR time window"
-        )
+        self.rule = QLabel("Same site  •  Fault time must be inside the PWR time window")
         self.rule.setObjectName("rule")
         self.rule.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(self.rule)
@@ -440,7 +438,6 @@ class ReviewPage(QWidget):
         self._set_field(self.tch_fields, "ticket", str(tch_mapping.get("ticket")))
         self._set_field(self.tch_fields, "result", target_text)
 
-
     def show_error(self, message: str) -> None:
         self.error.setText(message)
         self.error.show()
@@ -536,7 +533,9 @@ class PreviewTableModel(QAbstractTableModel):
             return QBrush(gray)
         return None
 
-    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole):
+    def headerData(
+        self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole
+    ):
         if role != Qt.ItemDataRole.DisplayRole:
             return None
         if orientation == Qt.Orientation.Horizontal and 0 <= section < len(self.headers):
@@ -579,7 +578,7 @@ def read_csv_preview(
             if len(row) < len(headers):
                 row.extend([""] * (len(headers) - len(row)))
             elif len(row) > len(headers):
-                row = row[:len(headers)]
+                row = row[: len(headers)]
 
             if query and query not in " ".join(row).casefold():
                 continue
@@ -780,4 +779,3 @@ class PreviewPage(QWidget):
 # -----------------------------------------------------------------------------
 # Processing
 # -----------------------------------------------------------------------------
-

@@ -55,7 +55,10 @@ class DropZone(QFrame):
         super().mousePressEvent(event)
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:  # noqa: N802
-        if any(url.isLocalFile() and Path(url.toLocalFile()).is_file() for url in event.mimeData().urls()):
+        if any(
+            url.isLocalFile() and Path(url.toLocalFile()).is_file()
+            for url in event.mimeData().urls()
+        ):
             event.acceptProposedAction()
         else:
             event.ignore()
@@ -131,5 +134,3 @@ class MappingRow(QWidget):
 
     def value(self) -> str | None:
         return self.combo.currentData()
-
-

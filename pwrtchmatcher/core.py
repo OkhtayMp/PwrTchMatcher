@@ -92,9 +92,7 @@ def validate_mapping(mapping: dict[str, str | None], required: tuple[str, ...]) 
 
 def parse_datetime_expr(column_name: str) -> pl.Expr:
     value = pl.col(column_name).cast(pl.String).str.strip_chars()
-    return pl.coalesce(
-        [value.str.strptime(pl.Datetime, fmt, strict=False) for fmt in DATE_FORMATS]
-    )
+    return pl.coalesce([value.str.strptime(pl.Datetime, fmt, strict=False) for fmt in DATE_FORMATS])
 
 
 def has_utf8_bom(path: Path) -> bool:
@@ -112,4 +110,3 @@ def safe_unlink(path: Path | None) -> None:
 # -----------------------------------------------------------------------------
 # Worker
 # -----------------------------------------------------------------------------
-

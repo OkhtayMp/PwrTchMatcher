@@ -72,29 +72,34 @@ def process_files(
         row_index_name=INTERNAL["pwr_row"],
     )
 
-    pwr = pwr.with_columns(
-        [
-            pl.col(p_site).cast(pl.String).str.strip_chars().alias(INTERNAL["pwr_site"]),
-            parse_datetime_expr(p_start).alias("__pwr_start_dt"),
-            parse_datetime_expr(p_end).alias("__pwr_end_dt"),
-        ]
-    ).with_columns(
-        [
-            pl.min_horizontal("__pwr_start_dt", "__pwr_end_dt").alias(INTERNAL["pwr_from"]),
-            pl.max_horizontal("__pwr_start_dt", "__pwr_end_dt").alias(INTERNAL["pwr_to"]),
-        ]
-    ).select(
-        [
-            INTERNAL["pwr_row"],
-            INTERNAL["pwr_site"],
-            INTERNAL["pwr_from"],
-            INTERNAL["pwr_to"],
-        ]
-    ).filter(
-        pl.col(INTERNAL["pwr_site"]).is_not_null()
-        & (pl.col(INTERNAL["pwr_site"]).str.len_chars() > 0)
-        & pl.col(INTERNAL["pwr_from"]).is_not_null()
-        & pl.col(INTERNAL["pwr_to"]).is_not_null()
+    pwr = (
+        pwr.with_columns(
+            [
+                pl.col(p_site).cast(pl.String).str.strip_chars().alias(INTERNAL["pwr_site"]),
+                parse_datetime_expr(p_start).alias("__pwr_start_dt"),
+                parse_datetime_expr(p_end).alias("__pwr_end_dt"),
+            ]
+        )
+        .with_columns(
+            [
+                pl.min_horizontal("__pwr_start_dt", "__pwr_end_dt").alias(INTERNAL["pwr_from"]),
+                pl.max_horizontal("__pwr_start_dt", "__pwr_end_dt").alias(INTERNAL["pwr_to"]),
+            ]
+        )
+        .select(
+            [
+                INTERNAL["pwr_row"],
+                INTERNAL["pwr_site"],
+                INTERNAL["pwr_from"],
+                INTERNAL["pwr_to"],
+            ]
+        )
+        .filter(
+            pl.col(INTERNAL["pwr_site"]).is_not_null()
+            & (pl.col(INTERNAL["pwr_site"]).str.len_chars() > 0)
+            & pl.col(INTERNAL["pwr_from"]).is_not_null()
+            & pl.col(INTERNAL["pwr_to"]).is_not_null()
+        )
     )
 
     if pwr.height == 0:
@@ -141,8 +146,7 @@ def process_files(
     # This avoids depending on a streaming path for the experimental/partial-
     # streaming non-equi join implementation.
     matches = (
-        tch_key
-        .join_where(
+        tch_key.join_where(
             pwr,
             pl.col(INTERNAL["tch_site"]) == pl.col(INTERNAL["pwr_site"]),
             pl.col(INTERNAL["tch_fault"]) >= pl.col(INTERNAL["pwr_from"]),
@@ -164,9 +168,7 @@ def process_files(
     joined = tch.join(matches, on=INTERNAL["tch_row"], how="left")
 
     if target == CREATE_COLUMN:
-        joined = joined.with_columns(
-            pl.col(INTERNAL["match_ticket"]).alias(target_name)
-        )
+        joined = joined.with_columns(pl.col(INTERNAL["match_ticket"]).alias(target_name))
     else:
         joined = joined.with_columns(
             pl.coalesce(
@@ -221,5 +223,3 @@ def process_files(
 # -----------------------------------------------------------------------------
 # Main window
 # -----------------------------------------------------------------------------
-
-

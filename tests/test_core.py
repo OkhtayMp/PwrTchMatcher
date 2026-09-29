@@ -14,5 +14,7 @@ def test_guess_column_exact_then_partial() -> None:
 
 
 def test_validate_mapping() -> None:
-    assert validate_mapping({"site": "A", "start": "B", "end": "C"}, ("site", "start", "end")) is None
+    assert (
+        validate_mapping({"site": "A", "start": "B", "end": "C"}, ("site", "start", "end")) is None
+    )
     assert validate_mapping({"site": "A", "start": "A", "end": "C"}, ("site", "start", "end"))

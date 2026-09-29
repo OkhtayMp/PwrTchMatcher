@@ -82,9 +82,7 @@ class MainWindow(QMainWindow):
 
         root.addWidget(self.stack, 1)
 
-        footer = QLabel(
-            f'<a href="{GITHUB_URL}">code.py · OkhtayMp · GitHub</a>'
-        )
+        footer = QLabel(f'<a href="{GITHUB_URL}">code.py · OkhtayMp · GitHub</a>')
         footer.setObjectName("footer")
         footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
         footer.setOpenExternalLinks(True)
@@ -255,9 +253,7 @@ class MainWindow(QMainWindow):
             return
 
         assert self.tch_page.file_path
-        default = self.tch_page.file_path.with_name(
-            self.tch_page.file_path.stem + "_matched.csv"
-        )
+        default = self.tch_page.file_path.with_name(self.tch_page.file_path.stem + "_matched.csv")
         output = save_csv_dialog(self, default)
         if not output:
             return
@@ -344,7 +340,6 @@ class MainWindow(QMainWindow):
         safe_unlink(self.temp_output)
         self.temp_output = None
         event.accept()
-
 
 
 def build_style(app: QApplication) -> str:

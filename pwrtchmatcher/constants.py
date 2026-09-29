@@ -36,6 +36,10 @@ PWR_ROLES = (
 
 TCH_ROLES = (
     ("site", "Zone / Site", ("Zone", "Site Name", "Site", "site_name", "site")),
-    ("fault_time", "Fault time", ("Fault First Occur Time", "First Occurred On", "Fault Time", "First Occur Time")),
+    (
+        "fault_time",
+        "Fault time",
+        ("Fault First Occur Time", "First Occurred On", "Fault Time", "First Occur Time"),
+    ),
     ("ticket", "Ticket ID", ("Ticket ID", "Ticket", "ticket_id")),
 )
