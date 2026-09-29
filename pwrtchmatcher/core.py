@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import csv
+from contextlib import suppress
 from pathlib import Path
 
 import polars as pl
 
-from .constants import DATE_FORMATS, INTERNAL
+from .constants import DATE_FORMATS
+
 
 def normalize_name(value: str) -> str:
     return " ".join(value.strip().lower().replace("_", " ").split())
@@ -103,10 +105,8 @@ def has_utf8_bom(path: Path) -> bool:
 def safe_unlink(path: Path | None) -> None:
     if path is None:
         return
-    try:
+    with suppress(OSError):
         path.unlink(missing_ok=True)
-    except OSError:
-        pass
 
 
 # -----------------------------------------------------------------------------

@@ -4,7 +4,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from PySide6.QtCore import QThreadPool, QUrl, Qt, Slot
+from PySide6.QtCore import Qt, QThreadPool, QUrl, Slot
 from PySide6.QtGui import QDesktopServices, QPalette
 from PySide6.QtWidgets import (
     QApplication,

@@ -11,12 +11,12 @@ from PySide6.QtCore import (
     QRectF,
     QRunnable,
     QSize,
-    QTimer,
     Qt,
+    QTimer,
     Signal,
     Slot,
 )
-from PySide6.QtGui import QColor, QPainter, QPalette, QPen, QPixmap
+from PySide6.QtGui import QColor, QPainter, QPalette, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication, QFileDialog, QSizePolicy, QWidget
 
@@ -187,7 +187,6 @@ def svg_pixmap(svg: str, size: int) -> QPixmap:
     painter.end()
     return pixmap
 
-
 class AnimatedFlowWidget(QWidget):
     """
     Static flow diagram.
@@ -287,6 +286,7 @@ class AnimatedFlowWidget(QWidget):
         renderer.render(painter, target)
 
         painter.end()
+
 
 # -----------------------------------------------------------------------------
 # UI widgets

@@ -7,9 +7,9 @@ from PySide6.QtCore import (
     QAbstractTableModel,
     QModelIndex,
     QObject,
+    Qt,
     QThreadPool,
     QTimer,
-    Qt,
     Signal,
     Slot,
 )
@@ -32,11 +32,8 @@ from PySide6.QtWidgets import (
 
 from .constants import CREATE_COLUMN
 from .core import guess_column, read_csv_header, validate_mapping
-from .qt_helpers import AnimatedFlowWidget, LOGO_SVG, Worker, svg_pixmap
+from .qt_helpers import LOGO_SVG, AnimatedFlowWidget, Worker, svg_pixmap
 from .widgets import DropZone, MappingRow
-
-
-_ROOT_INDEX = QModelIndex()
 
 
 class FilePage(QWidget):
@@ -507,11 +504,11 @@ class PreviewTableModel(QAbstractTableModel):
         self.unmatched = unmatched
         self.endResetModel()
 
-    def rowCount(self, parent: QModelIndex = _ROOT_INDEX) -> int:  # noqa: N802
-        return 0 if parent.isValid() else len(self.rows)
+    def rowCount(self, parent: QModelIndex | None = None) -> int:  # noqa: N802
+        return 0 if parent is not None and parent.isValid() else len(self.rows)
 
-    def columnCount(self, parent: QModelIndex = _ROOT_INDEX) -> int:  # noqa: N802
-        return 0 if parent.isValid() else len(self.headers)
+    def columnCount(self, parent: QModelIndex | None = None) -> int:  # noqa: N802
+        return 0 if parent is not None and parent.isValid() else len(self.headers)
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole):
         if not index.isValid():
