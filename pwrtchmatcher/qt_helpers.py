@@ -7,12 +7,10 @@ from pathlib import Path
 from PySide6.QtCore import (
     QByteArray,
     QObject,
-    QPointF,
     QRectF,
     QRunnable,
     QSize,
     Qt,
-    QTimer,
     Signal,
     Slot,
 )
@@ -47,12 +45,9 @@ class Worker(QRunnable):
             # functions such as read_csv_header().
             try:
                 signature = inspect.signature(self.function)
-                accepts_progress = (
-                    "progress" in signature.parameters
-                    or any(
-                        parameter.kind == inspect.Parameter.VAR_KEYWORD
-                        for parameter in signature.parameters.values()
-                    )
+                accepts_progress = "progress" in signature.parameters or any(
+                    parameter.kind == inspect.Parameter.VAR_KEYWORD
+                    for parameter in signature.parameters.values()
                 )
             except (TypeError, ValueError):
                 accepts_progress = False
@@ -187,6 +182,7 @@ def svg_pixmap(svg: str, size: int) -> QPixmap:
     painter.end()
     return pixmap
 
+
 class AnimatedFlowWidget(QWidget):
     """
     Static flow diagram.
@@ -228,9 +224,7 @@ class AnimatedFlowWidget(QWidget):
         svg = themed_svg(FLOW_SVG)
 
         if svg != self._last_svg:
-            self._renderer.load(
-                QByteArray(svg.encode("utf-8"))
-            )
+            self._renderer.load(QByteArray(svg.encode("utf-8")))
             self._last_svg = svg
             self.updateGeometry()
             self.update()
@@ -310,6 +304,7 @@ def _run_native_file_dialog(callback):
 
 def open_csv_dialog(parent: QWidget, label: str) -> str:
     """Open the system file picker without the application's visual theme."""
+
     def _open():
         path, _ = QFileDialog.getOpenFileName(
             parent,
@@ -325,6 +320,7 @@ def open_csv_dialog(parent: QWidget, label: str) -> str:
 
 def save_csv_dialog(parent: QWidget, default_path: Path) -> str:
     """Open the system save dialog without the application's visual theme."""
+
     def _save():
         path, _ = QFileDialog.getSaveFileName(
             parent,
@@ -344,5 +340,3 @@ def save_csv_dialog(parent: QWidget, default_path: Path) -> str:
     if selected.suffix.lower() != ".csv":
         selected = selected.with_suffix(".csv")
     return str(selected)
-
-
