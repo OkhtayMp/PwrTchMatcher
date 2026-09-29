@@ -58,4 +58,8 @@ The source CSV files are never overwritten by the application; the user chooses 
 
 ## License
 
-MIT
+PwrTchMatcher is proprietary software. Personal, non-commercial use is permitted at no charge under `LICENSE`.
+
+Commercial or organizational use requires a paid commercial license of **USD 12,000 per legal entity per 12 months**, unless a separate written agreement states otherwise.
+
+The software is not released under an open-source license.

@@ -9,7 +9,7 @@ description = "Cross-platform PWR/TCH CSV matcher with a PySide6 GUI"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
 authors = [{name = "Okhtay"}]
-license = {text = "MIT"}
+license = {file = "LICENSE"}
 dependencies = [
   "PySide6==6.11.2",
   "polars==1.44.2",

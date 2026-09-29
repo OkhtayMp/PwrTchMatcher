@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import inspect
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from PySide6.QtCore import (
     QByteArray,
@@ -11,25 +11,15 @@ from PySide6.QtCore import (
     QRectF,
     QRunnable,
     QSize,
-    Qt,
-    QThreadPool,
     QTimer,
-    QUrl,
+    Qt,
     Signal,
     Slot,
 )
-from PySide6.QtGui import (
-    QColor,
-    QDesktopServices,
-    QDragEnterEvent,
-    QDropEvent,
-    QPainter,
-    QPalette,
-    QPen,
-    QPixmap,
-)
+from PySide6.QtGui import QColor, QPainter, QPalette, QPen, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication, QFileDialog, QSizePolicy, QWidget
+
 
 class WorkerSignals(QObject):
     finished = Signal(object)
@@ -199,55 +189,80 @@ def svg_pixmap(svg: str, size: int) -> QPixmap:
 
 
 class AnimatedFlowWidget(QWidget):
-    """Small, lightweight animated flow diagram used on the review page."""
+    """
+    Static flow diagram.
+
+    The SVG itself is rendered exactly as supplied.
+    No timer, no travelling signal, no particles, no pulsing ring,
+    and no additional painting is performed over the SVG.
+    """
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+
         self.setObjectName("flowDiagram")
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        self._phase = 0.0
+        self.setAttribute(
+            Qt.WidgetAttribute.WA_TranslucentBackground,
+            True,
+        )
+        self.setSizePolicy(
+            QSizePolicy.Policy.Fixed,
+            QSizePolicy.Policy.Fixed,
+        )
+
         self._renderer = QSvgRenderer()
         self._last_svg = ""
 
-        self._timer = QTimer(self)
-        self._timer.setInterval(40)
-        self._timer.timeout.connect(self._tick)
-        self._timer.start()
+        # Load immediately so sizeHint() works correctly.
+        self._current_renderer()
 
     def sizeHint(self) -> QSize:  # noqa: N802
         renderer = self._current_renderer()
         size = renderer.defaultSize()
+
         if size.isValid() and size.width() > 0 and size.height() > 0:
             return size
+
         return QSize(540, 112)
 
     def _current_renderer(self) -> QSvgRenderer:
         svg = themed_svg(FLOW_SVG)
+
         if svg != self._last_svg:
-            self._renderer.load(QByteArray(svg.encode("utf-8")))
+            self._renderer.load(
+                QByteArray(svg.encode("utf-8"))
+            )
             self._last_svg = svg
             self.updateGeometry()
-        return self._renderer
+            self.update()
 
-    def _tick(self) -> None:
-        self._phase = (self._phase + 0.018) % 1.0
-        self.update()
+        return self._renderer
 
     def paintEvent(self, event) -> None:  # noqa: N802
         del event
+
         renderer = self._current_renderer()
         source = renderer.defaultSize()
+
         if source.width() <= 0 or source.height() <= 0:
             return
 
         available = self.rect().adjusted(0, 0, -1, -1)
+
         scale = min(
             available.width() / source.width(),
             available.height() / source.height(),
         )
-        width = max(1, round(source.width() * scale))
-        height = max(1, round(source.height() * scale))
+
+        width = max(
+            1,
+            round(source.width() * scale),
+        )
+        height = max(
+            1,
+            round(source.height() * scale),
+        )
+
         target = QRectF(
             (self.width() - width) / 2,
             (self.height() - height) / 2,
@@ -256,33 +271,22 @@ class AnimatedFlowWidget(QWidget):
         )
 
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setRenderHint(
+            QPainter.RenderHint.Antialiasing,
+            True,
+        )
+
+        # Render ONLY the SVG.
+        #
+        # IMPORTANT:
+        # There is intentionally no additional drawing here.
+        # No travelling dot.
+        # No halo.
+        # No pulse.
+        # No moving ring.
         renderer.render(painter, target)
 
-        # A tiny travelling signal gives the static SVG a restrained motion
-        # without relying on unsupported SVG/SMIL animation in QSvgRenderer.
-        accent = QApplication.instance().palette().color(QPalette.ColorRole.Highlight)
-        accent.setAlpha(235)
-        x = target.left() + target.width() * (0.26 + 0.48 * self._phase)
-        y = target.top() + target.height() * 0.50
-
-        halo = QColor(accent)
-        halo.setAlpha(38)
-        painter.setBrush(halo)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(QPointF(x, y), 7.0, 7.0)
-
-        painter.setBrush(accent)
-        painter.drawEllipse(QPointF(x, y), 2.2, 2.2)
-
-        pulse = 5.0 + (self._phase * 2.5)
-        ring = QColor(accent)
-        ring.setAlpha(45)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.setPen(QPen(ring, 1.2))
-        painter.drawEllipse(QPointF(target.center().x(), target.center().y()), pulse, pulse)
         painter.end()
-
 
 # -----------------------------------------------------------------------------
 # UI widgets

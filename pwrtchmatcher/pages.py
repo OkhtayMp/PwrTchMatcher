@@ -3,11 +3,20 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, QThreadPool, Qt, QTimer, Signal, Slot
+from PySide6.QtCore import (
+    QAbstractTableModel,
+    QModelIndex,
+    QObject,
+    QThreadPool,
+    QTimer,
+    Qt,
+    Signal,
+    Slot,
+)
 from PySide6.QtGui import QBrush, QColor, QPalette
 from PySide6.QtWidgets import (
     QAbstractItemView,
-    QComboBox,
+    QApplication,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -16,17 +25,19 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QProgressBar,
     QPushButton,
-    QSizePolicy,
     QTableView,
     QVBoxLayout,
     QWidget,
-    QApplication,
 )
 
-from .constants import CREATE_COLUMN, PWR_ROLES, TCH_ROLES
+from .constants import CREATE_COLUMN
 from .core import guess_column, read_csv_header, validate_mapping
 from .qt_helpers import AnimatedFlowWidget, LOGO_SVG, Worker, svg_pixmap
 from .widgets import DropZone, MappingRow
+
+
+_ROOT_INDEX = QModelIndex()
+
 
 class FilePage(QWidget):
     continueRequested = Signal()
@@ -496,10 +507,10 @@ class PreviewTableModel(QAbstractTableModel):
         self.unmatched = unmatched
         self.endResetModel()
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
+    def rowCount(self, parent: QModelIndex = _ROOT_INDEX) -> int:  # noqa: N802
         return 0 if parent.isValid() else len(self.rows)
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
+    def columnCount(self, parent: QModelIndex = _ROOT_INDEX) -> int:  # noqa: N802
         return 0 if parent.isValid() else len(self.headers)
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole):

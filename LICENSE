@@ -1,21 +1,93 @@
-MIT License
+PwrTchMatcher Proprietary Commercial License v1.0
 
 Copyright (c) 2026 OkhtayMp
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+IMPORTANT: This is a proprietary license. It is not an open-source license.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. PERSONAL / NON-COMMERCIAL USE
+
+A natural person may use, run, and privately modify the Software for personal,
+non-commercial purposes at no charge, provided that this license and the
+copyright notice remain with copies of the Software.
+
+2. COMMERCIAL / ORGANIZATIONAL USE
+
+Any company, business, corporation, contractor, government entity, nonprofit,
+association, institution, or other organization must obtain a paid commercial
+license before using the Software for any commercial, operational, internal,
+customer-facing, revenue-generating, or other organizational purpose.
+
+The commercial license fee is:
+
+    USD 12,000 per legal entity per 12-month license term.
+
+The license term begins on the effective date stated in the applicable invoice,
+order, or written license agreement. A license must be renewed for continued
+use after the 12-month term. A different fee, term, seat count, deployment
+scope, or set of rights is valid only when expressly agreed in writing by the
+copyright holder.
+
+3. RESTRICTIONS WITHOUT A COMMERCIAL LICENSE
+
+Without a valid commercial license, an organization may not:
+
+- use the Software for business or organizational operations;
+- deploy the Software to employees, contractors, customers, or production
+  systems;
+- use the Software to provide paid services or support a revenue-generating
+  activity;
+- sublicense, rent, lease, sell, or commercially distribute the Software; or
+- remove or alter copyright, license, or attribution notices.
+
+4. REDISTRIBUTION
+
+Redistribution of modified or unmodified copies is not permitted for
+commercial purposes without a written commercial license. Personal,
+non-commercial sharing is permitted only when the complete license text and
+copyright notice are retained and no fee or commercial benefit is charged for
+the Software itself.
+
+5. SOURCE CODE AND DERIVATIVE WORKS
+
+Personal, non-commercial modifications are permitted. Commercial use of the
+Software or derivative works requires a commercial license, whether the
+Software is used directly, embedded into another application, or modified.
+
+6. NO TRANSFER
+
+A commercial license is granted to the licensed legal entity and is not
+transferable to another legal entity unless expressly agreed in writing.
+Affiliates, subsidiaries, sister companies, contractors, or related entities
+are not included unless the written commercial license expressly says so.
+
+7. TERMINATION
+
+Any license granted under this agreement terminates automatically if the
+licensee materially violates its terms. Upon termination, the licensee must
+stop using and distributing the Software and delete copies that it is not
+otherwise legally entitled to retain.
+
+8. OWNERSHIP
+
+The Software remains the intellectual property of OkhtayMp. No ownership or
+other intellectual-property rights are transferred by this license except for
+the limited rights expressly granted above.
+
+9. WARRANTY DISCLAIMER AND LIMITATION OF LIABILITY
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. TO THE MAXIMUM EXTENT
+PERMITTED BY LAW, THE COPYRIGHT HOLDER SHALL NOT BE LIABLE FOR ANY INDIRECT,
+INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR EXEMPLARY DAMAGES ARISING FROM THE USE
+OF THE SOFTWARE.
+
+10. COMMERCIAL LICENSE CONTACT
+
+Commercial licensing, enterprise terms, deployment scope, and any negotiated
+exceptions must be agreed in writing with the copyright holder before
+commercial use begins.
+
+This license is intended as a software-license template and is not legal
+advice. The copyright holder may replace or supplement these terms with a
+separate written commercial agreement.

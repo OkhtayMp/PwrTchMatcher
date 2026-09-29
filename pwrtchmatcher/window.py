@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import shutil
-import sys
 import tempfile
 from pathlib import Path
 
@@ -19,11 +18,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .constants import APP_NAME, GITHUB_URL, CREATE_COLUMN, PWR_ROLES, TCH_ROLES
+from .constants import APP_NAME, GITHUB_URL, PWR_ROLES, TCH_ROLES
 from .core import safe_unlink, validate_mapping
 from .matcher import process_files
 from .pages import FilePage, PreviewPage, ProcessingPage, ReviewPage
 from .qt_helpers import LOGO_SVG, Worker, save_csv_dialog, svg_pixmap
+
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
