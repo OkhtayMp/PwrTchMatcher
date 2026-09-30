@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release, without v (e.g. 0.2.0)"
+        description: "Version to release, without v (e.g. 0.2.5)"
         required: true
         type: string
 
@@ -41,7 +41,6 @@ jobs:
           fi
 
           git fetch --tags --force
-
           if git show-ref --verify --quiet "refs/tags/v${VERSION}"; then
             echo "Local tag v${VERSION} already exists." >&2
             exit 1
