@@ -137,6 +137,8 @@ jobs:
 
       - name: Build Nuitka onefile
         shell: bash
+        env:
+          NUITKA_WINDOWS_STARTUP_LOG: "1"
         run: |
           set -euo pipefail
           rm -rf dist release
@@ -147,14 +149,52 @@ jobs:
           python -m nuitka \
             --mode=onefile \
             --enable-plugin=pyside6 \
+            --include-qt-plugins=sensible \
             --assume-yes-for-downloads \
             --follow-imports \
             --include-package=pwrtchmatcher \
             --include-package=polars \
             --output-dir=dist \
             --output-filename="$OUTPUT" \
-            ${{ matrix.target == 'win-x64' && '--windows-console-mode=disable' || '' }} \
+            ${{ matrix.target == 'win-x64' && '--windows-console-mode=disable --include-windows-runtime-dlls=yes --force-stdout-spec={PROGRAM_BASE}.stdout.log --force-stderr-spec={PROGRAM_BASE}.stderr.log' || '' }} \
             "$ENTRYPOINT"
+
+      - name: Verify Windows executable startup
+        if: matrix.target == 'win-x64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $env:GITHUB_WORKSPACE "dist\${env:APP_SLUG}-win-x64.exe"
+          if (-not (Test-Path -LiteralPath $exe)) {
+            throw "Windows executable not found: $exe"
+          }
+
+          $stdoutLog = "$([System.IO.Path]::ChangeExtension($exe, $null)).stdout.log"
+          $stderrLog = "$([System.IO.Path]::ChangeExtension($exe, $null)).stderr.log"
+          Remove-Item -LiteralPath $stdoutLog, $stderrLog -Force -ErrorAction SilentlyContinue
+
+          Write-Host "Launching actual Windows executable: $exe"
+          $process = Start-Process -FilePath $exe -WorkingDirectory (Split-Path -Parent $exe) -PassThru
+          Start-Sleep -Seconds 8
+
+          if ($process.HasExited) {
+            $exitCode = $process.ExitCode
+            $stdout = if (Test-Path -LiteralPath $stdoutLog) { Get-Content -LiteralPath $stdoutLog -Raw } else { "" }
+            $stderr = if (Test-Path -LiteralPath $stderrLog) { Get-Content -LiteralPath $stderrLog -Raw } else { "" }
+            Write-Host "--- startup stdout ---"
+            Write-Host $stdout
+            Write-Host "--- startup stderr ---"
+            Write-Host $stderr
+            throw "Windows executable exited during startup. ExitCode=$exitCode"
+          }
+
+          Write-Host "Windows executable is still running after startup check."
+          Write-Host "--- startup stdout ---"
+          if (Test-Path -LiteralPath $stdoutLog) { Get-Content -LiteralPath $stdoutLog -Raw }
+          Write-Host "--- startup stderr ---"
+          if (Test-Path -LiteralPath $stderrLog) { Get-Content -LiteralPath $stderrLog -Raw }
+
+          Stop-Process -Id $process.Id -Force
 
       - name: Prepare release files
         shell: bash
