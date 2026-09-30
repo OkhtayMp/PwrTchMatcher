@@ -27,7 +27,7 @@ jobs:
   build:
     name: Build • ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
+    timeout-minutes: 50
     strategy:
       fail-fast: false
       matrix:
@@ -69,10 +69,12 @@ jobs:
           else
             TAG="${GITHUB_REF_NAME}"
           fi
+
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Invalid release tag: $TAG" >&2
             exit 1
           fi
+
           VERSION="${TAG#v}"
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
@@ -90,30 +92,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            libegl1 \
-            libgl1 \
-            libopengl0 \
-            libxkbcommon0 \
-            libxkbcommon-x11-0 \
-            libxcb-cursor0 \
-            libxcb-icccm4 \
-            libxcb-image0 \
-            libxcb-keysyms1 \
-            libxcb-randr0 \
-            libxcb-render-util0 \
-            libxcb-shape0 \
-            libxcb-shm0 \
-            libxcb-sync1 \
-            libxcb-xfixes0 \
-            libxcb1 \
-            libx11-6 \
-            libx11-xcb1 \
-            libxrender1 \
-            libxext6 \
-            libfontconfig1 \
-            libfreetype6 \
-            libdbus-1-3
+          sudo apt-get install -y             libegl1             libgl1             libopengl0             libxkbcommon0             libxkbcommon-x11-0             libxcb-cursor0             libxcb-icccm4             libxcb-image0             libxcb-keysyms1             libxcb-randr0             libxcb-render-util0             libxcb-shape0             libxcb-shm0             libxcb-sync1             libxcb-xfixes0             libxcb1             libx11-6             libx11-xcb1             libxrender1             libxext6             libfontconfig1             libfreetype6             libdbus-1-3
 
       - name: Inject release version
         shell: bash
@@ -124,14 +103,6 @@ jobs:
       - name: Install build dependencies
         run: python -m pip install -r requirements-build.txt
 
-      - name: Show tool versions
-        shell: bash
-        run: |
-          set -euo pipefail
-          python --version
-          python -m nuitka --version
-          python -c "import PySide6, polars; print('PySide6', PySide6.__version__); print('Polars', polars.__version__)"
-
       - name: Verify source
         shell: bash
         env:
@@ -141,16 +112,14 @@ jobs:
           python -m compileall -q pwrtchmatcher pwr_tch_matcher_entry.py
           python -c "from pwrtchmatcher.app import main; from pwrtchmatcher.window import MainWindow; print('Import smoke: PASS')"
 
-      # First prove that the complete application works as a compiled
-      # standalone distribution. This isolates onefile bootstrap/extraction
-      # problems from the application/dependency packaging itself.
-      - name: Windows standalone build smoke
+      - name: Build Nuitka standalone
         if: runner.os == 'Windows'
         shell: bash
         run: |
           set -euo pipefail
           rm -rf dist-standalone
           mkdir -p dist-standalone
+
           python -m nuitka \
             --mode=standalone \
             --enable-plugin=pyside6 \
@@ -161,34 +130,82 @@ jobs:
             --include-package=pwrtchmatcher \
             --include-package=polars \
             --output-dir=dist-standalone \
-            --output-filename="${APP_SLUG}-standalone${{ matrix.extension }}" \
+            --output-filename="${APP_SLUG}-standalone.exe" \
+            --windows-console-mode=disable \
             "$ENTRYPOINT"
 
       - name: Windows standalone runtime smoke
         if: runner.os == 'Windows'
         shell: powershell
         env:
-          QT_QPA_PLATFORM: offscreen
+          QT_QPA_PLATFORM: windows
         run: |
           $ErrorActionPreference = 'Stop'
-          $exe = Join-Path $PWD "dist-standalone\${env:APP_SLUG}-standalone.dist\${env:APP_SLUG}-standalone.exe"
-          if (-not (Test-Path -LiteralPath $exe)) {
-            Get-ChildItem -Recurse -Path dist-standalone | Select-Object FullName
-            throw "Standalone executable was not found: $exe"
+
+          $root = Join-Path $PWD 'dist-standalone'
+
+          if (-not (Test-Path -LiteralPath $root -PathType Container)) {
+            throw "Standalone output directory was not found: $root"
           }
-          Write-Host "Launching compiled standalone executable: $exe"
-          $p = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru -WindowStyle Hidden
-          Start-Sleep -Seconds 8
+
+          Write-Host '--- Standalone build tree ---'
+          Get-ChildItem -LiteralPath $root -Recurse -File |
+            Select-Object FullName, Length |
+            Format-Table -AutoSize |
+            Out-String |
+            Write-Host
+
+          $exe = Get-ChildItem -LiteralPath $root -Recurse -File -Filter '*.exe' |
+            Where-Object { $_.FullName -match '\.dist\' } |
+            Select-Object -First 1
+
+          if ($null -eq $exe) {
+            throw "No standalone executable was found under: $root"
+          }
+
+          $exePath = $exe.FullName
+          $workDir = $exe.DirectoryName
+          $logPath = Join-Path $workDir 'startup.log'
+
+          Write-Host "Standalone executable: $exePath"
+          Write-Host "Working directory: $workDir"
+          Write-Host "Startup log: $logPath"
+
+          $p = Start-Process `
+            -FilePath $exePath `
+            -WorkingDirectory $workDir `
+            -PassThru `
+            -WindowStyle Hidden `
+            -RedirectStandardOutput $logPath `
+            -RedirectStandardError $logPath
+
+          Start-Sleep -Seconds 10
+          $p.Refresh()
+
           if ($p.HasExited) {
             $exitCode = $p.ExitCode
             Write-Host "Standalone exit code: $exitCode"
-            Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000,1001} -MaxEvents 20 -ErrorAction SilentlyContinue |
-              Where-Object { $_.Message -match [regex]::Escape([IO.Path]::GetFileName($exe)) } |
-              Select-Object -First 5 TimeCreated, Id, Message | Format-List | Out-String | Write-Host
-            throw "Compiled standalone executable exited during startup. ExitCode=$exitCode"
+
+            if (Test-Path -LiteralPath $logPath) {
+              Write-Host '--- startup.log ---'
+              Get-Content -LiteralPath $logPath -ErrorAction SilentlyContinue | Write-Host
+            }
+
+            Write-Host '--- Windows application errors ---'
+            Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Id = 1000,1001 } -MaxEvents 50 -ErrorAction SilentlyContinue |
+              Where-Object {
+                $_.Message -match [regex]::Escape([IO.Path]::GetFileName($exePath))
+              } |
+              Select-Object -First 10 TimeCreated, Id, Message |
+              Format-List |
+              Out-String |
+              Write-Host
+
+            throw "Standalone executable exited during startup. ExitCode=$exitCode"
           }
+
           Stop-Process -Id $p.Id -Force
-          Write-Host 'Standalone runtime smoke: PASS'
+          Write-Host 'Windows standalone runtime smoke: PASS'
 
       - name: Build Nuitka onefile
         shell: bash
@@ -203,7 +220,7 @@ jobs:
             --mode=onefile \
             --enable-plugin=pyside6 \
             --include-qt-plugins=sensible \
-            --include-windows-runtime-dlls=yes \
+            ${{ matrix.target == 'win-x64' && '--include-windows-runtime-dlls=yes' || '' }} \
             --assume-yes-for-downloads \
             --follow-imports \
             --include-package=pwrtchmatcher \
@@ -213,53 +230,45 @@ jobs:
             ${{ matrix.target == 'win-x64' && '--windows-console-mode=disable' || '' }} \
             "$ENTRYPOINT"
 
-      - name: Windows onefile runtime smoke with startup logs
+      - name: Windows onefile runtime smoke
         if: runner.os == 'Windows'
         shell: powershell
         env:
-          QT_QPA_PLATFORM: offscreen
+          QT_QPA_PLATFORM: windows
         run: |
           $ErrorActionPreference = 'Stop'
+
           $exe = Join-Path $PWD "dist\${env:APP_SLUG}-win-x64.exe"
-          $log = Join-Path $PWD 'windows-startup.log'
-          "Executable: $exe" | Set-Content -Encoding UTF8 $log
-          "Time: $(Get-Date -Format o)" | Add-Content -Encoding UTF8 $log
-          if (-not (Test-Path -LiteralPath $exe)) {
-            throw "Onefile executable was not found: $exe"
+          if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
+            throw "Windows onefile executable was not found: $exe"
           }
 
-          Write-Host "Launching actual Windows executable: $exe"
-          $p = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru -WindowStyle Hidden
+          $logPath = Join-Path $PWD 'dist\onefile-startup.log'
+          Write-Host "Launching onefile executable: $exe"
+
+          $p = Start-Process `
+            -FilePath $exe `
+            -WorkingDirectory (Split-Path $exe) `
+            -PassThru `
+            -WindowStyle Hidden `
+            -RedirectStandardOutput $logPath `
+            -RedirectStandardError $logPath
+
           Start-Sleep -Seconds 10
           $p.Refresh()
 
           if ($p.HasExited) {
             $exitCode = $p.ExitCode
-            "ExitCode: $exitCode" | Add-Content -Encoding UTF8 $log
-            "--- Application Error events ---" | Add-Content -Encoding UTF8 $log
-            Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000,1001} -MaxEvents 50 -ErrorAction SilentlyContinue |
-              Where-Object { $_.Message -match [regex]::Escape([IO.Path]::GetFileName($exe)) } |
-              Select-Object -First 10 TimeCreated, Id, Message |
-              Format-List | Out-String | Add-Content -Encoding UTF8 $log
-            "--- Dist files ---" | Add-Content -Encoding UTF8 $log
-            Get-ChildItem -Force -Path dist | Select-Object Name, Length | Format-Table -AutoSize |
-              Out-String | Add-Content -Encoding UTF8 $log
-            Write-Host (Get-Content -Raw $log)
+            Write-Host "Onefile exit code: $exitCode"
+            if (Test-Path -LiteralPath $logPath) {
+              Write-Host '--- onefile startup log ---'
+              Get-Content -LiteralPath $logPath -ErrorAction SilentlyContinue | Write-Host
+            }
             throw "Windows onefile executable exited during startup. ExitCode=$exitCode"
           }
 
-          "ExitCode: RUNNING_AFTER_10S" | Add-Content -Encoding UTF8 $log
           Stop-Process -Id $p.Id -Force
           Write-Host 'Windows onefile runtime smoke: PASS'
-
-      - name: Upload Windows startup diagnostics
-        if: runner.os == 'Windows' && always()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: windows-startup-diagnostics
-          path: windows-startup.log
-          if-no-files-found: ignore
-          retention-days: 7
 
       - name: Prepare release files
         shell: bash
@@ -317,10 +326,12 @@ jobs:
           else
             TAG="${GITHUB_REF_NAME}"
           fi
+
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Invalid release tag: $TAG" >&2
             exit 1
           fi
+
           echo "TAG=$TAG" >> "$GITHUB_ENV"
 
       - name: Verify release assets
