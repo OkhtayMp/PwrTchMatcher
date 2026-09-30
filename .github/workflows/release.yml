@@ -27,7 +27,7 @@ jobs:
   build:
     name: Build • ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 50
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -69,12 +69,10 @@ jobs:
           else
             TAG="${GITHUB_REF_NAME}"
           fi
-
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Invalid release tag: $TAG" >&2
             exit 1
           fi
-
           VERSION="${TAG#v}"
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
@@ -126,6 +124,14 @@ jobs:
       - name: Install build dependencies
         run: python -m pip install -r requirements-build.txt
 
+      - name: Show tool versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python --version
+          python -m nuitka --version
+          python -c "import PySide6, polars; print('PySide6', PySide6.__version__); print('Polars', polars.__version__)"
+
       - name: Verify source
         shell: bash
         env:
@@ -135,10 +141,57 @@ jobs:
           python -m compileall -q pwrtchmatcher pwr_tch_matcher_entry.py
           python -c "from pwrtchmatcher.app import main; from pwrtchmatcher.window import MainWindow; print('Import smoke: PASS')"
 
+      # First prove that the complete application works as a compiled
+      # standalone distribution. This isolates onefile bootstrap/extraction
+      # problems from the application/dependency packaging itself.
+      - name: Windows standalone build smoke
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist-standalone
+          mkdir -p dist-standalone
+          python -m nuitka \
+            --mode=standalone \
+            --enable-plugin=pyside6 \
+            --include-qt-plugins=sensible \
+            --include-windows-runtime-dlls=yes \
+            --assume-yes-for-downloads \
+            --follow-imports \
+            --include-package=pwrtchmatcher \
+            --include-package=polars \
+            --output-dir=dist-standalone \
+            --output-filename="${APP_SLUG}-standalone${{ matrix.extension }}" \
+            "$ENTRYPOINT"
+
+      - name: Windows standalone runtime smoke
+        if: runner.os == 'Windows'
+        shell: powershell
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $PWD "dist-standalone\${env:APP_SLUG}-standalone.dist\${env:APP_SLUG}-standalone.exe"
+          if (-not (Test-Path -LiteralPath $exe)) {
+            Get-ChildItem -Recurse -Path dist-standalone | Select-Object FullName
+            throw "Standalone executable was not found: $exe"
+          }
+          Write-Host "Launching compiled standalone executable: $exe"
+          $p = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru -WindowStyle Hidden
+          Start-Sleep -Seconds 8
+          if ($p.HasExited) {
+            $exitCode = $p.ExitCode
+            Write-Host "Standalone exit code: $exitCode"
+            Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000,1001} -MaxEvents 20 -ErrorAction SilentlyContinue |
+              Where-Object { $_.Message -match [regex]::Escape([IO.Path]::GetFileName($exe)) } |
+              Select-Object -First 5 TimeCreated, Id, Message | Format-List | Out-String | Write-Host
+            throw "Compiled standalone executable exited during startup. ExitCode=$exitCode"
+          }
+          Stop-Process -Id $p.Id -Force
+          Write-Host 'Standalone runtime smoke: PASS'
+
       - name: Build Nuitka onefile
         shell: bash
-        env:
-          NUITKA_WINDOWS_STARTUP_LOG: "1"
         run: |
           set -euo pipefail
           rm -rf dist release
@@ -150,51 +203,63 @@ jobs:
             --mode=onefile \
             --enable-plugin=pyside6 \
             --include-qt-plugins=sensible \
+            --include-windows-runtime-dlls=yes \
             --assume-yes-for-downloads \
             --follow-imports \
             --include-package=pwrtchmatcher \
             --include-package=polars \
             --output-dir=dist \
             --output-filename="$OUTPUT" \
-            ${{ matrix.target == 'win-x64' && '--windows-console-mode=disable --include-windows-runtime-dlls=yes --force-stdout-spec={PROGRAM_BASE}.stdout.log --force-stderr-spec={PROGRAM_BASE}.stderr.log' || '' }} \
+            ${{ matrix.target == 'win-x64' && '--windows-console-mode=disable' || '' }} \
             "$ENTRYPOINT"
 
-      - name: Verify Windows executable startup
-        if: matrix.target == 'win-x64'
-        shell: pwsh
+      - name: Windows onefile runtime smoke with startup logs
+        if: runner.os == 'Windows'
+        shell: powershell
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: |
           $ErrorActionPreference = 'Stop'
-          $exe = Join-Path $env:GITHUB_WORKSPACE "dist\${env:APP_SLUG}-win-x64.exe"
+          $exe = Join-Path $PWD "dist\${env:APP_SLUG}-win-x64.exe"
+          $log = Join-Path $PWD 'windows-startup.log'
+          "Executable: $exe" | Set-Content -Encoding UTF8 $log
+          "Time: $(Get-Date -Format o)" | Add-Content -Encoding UTF8 $log
           if (-not (Test-Path -LiteralPath $exe)) {
-            throw "Windows executable not found: $exe"
+            throw "Onefile executable was not found: $exe"
           }
-
-          $stdoutLog = "$([System.IO.Path]::ChangeExtension($exe, $null)).stdout.log"
-          $stderrLog = "$([System.IO.Path]::ChangeExtension($exe, $null)).stderr.log"
-          Remove-Item -LiteralPath $stdoutLog, $stderrLog -Force -ErrorAction SilentlyContinue
 
           Write-Host "Launching actual Windows executable: $exe"
-          $process = Start-Process -FilePath $exe -WorkingDirectory (Split-Path -Parent $exe) -PassThru
-          Start-Sleep -Seconds 8
+          $p = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru -WindowStyle Hidden
+          Start-Sleep -Seconds 10
+          $p.Refresh()
 
-          if ($process.HasExited) {
-            $exitCode = $process.ExitCode
-            $stdout = if (Test-Path -LiteralPath $stdoutLog) { Get-Content -LiteralPath $stdoutLog -Raw } else { "" }
-            $stderr = if (Test-Path -LiteralPath $stderrLog) { Get-Content -LiteralPath $stderrLog -Raw } else { "" }
-            Write-Host "--- startup stdout ---"
-            Write-Host $stdout
-            Write-Host "--- startup stderr ---"
-            Write-Host $stderr
-            throw "Windows executable exited during startup. ExitCode=$exitCode"
+          if ($p.HasExited) {
+            $exitCode = $p.ExitCode
+            "ExitCode: $exitCode" | Add-Content -Encoding UTF8 $log
+            "--- Application Error events ---" | Add-Content -Encoding UTF8 $log
+            Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000,1001} -MaxEvents 50 -ErrorAction SilentlyContinue |
+              Where-Object { $_.Message -match [regex]::Escape([IO.Path]::GetFileName($exe)) } |
+              Select-Object -First 10 TimeCreated, Id, Message |
+              Format-List | Out-String | Add-Content -Encoding UTF8 $log
+            "--- Dist files ---" | Add-Content -Encoding UTF8 $log
+            Get-ChildItem -Force -Path dist | Select-Object Name, Length | Format-Table -AutoSize |
+              Out-String | Add-Content -Encoding UTF8 $log
+            Write-Host (Get-Content -Raw $log)
+            throw "Windows onefile executable exited during startup. ExitCode=$exitCode"
           }
 
-          Write-Host "Windows executable is still running after startup check."
-          Write-Host "--- startup stdout ---"
-          if (Test-Path -LiteralPath $stdoutLog) { Get-Content -LiteralPath $stdoutLog -Raw }
-          Write-Host "--- startup stderr ---"
-          if (Test-Path -LiteralPath $stderrLog) { Get-Content -LiteralPath $stderrLog -Raw }
+          "ExitCode: RUNNING_AFTER_10S" | Add-Content -Encoding UTF8 $log
+          Stop-Process -Id $p.Id -Force
+          Write-Host 'Windows onefile runtime smoke: PASS'
 
-          Stop-Process -Id $process.Id -Force
+      - name: Upload Windows startup diagnostics
+        if: runner.os == 'Windows' && always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: windows-startup-diagnostics
+          path: windows-startup.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Prepare release files
         shell: bash
@@ -252,12 +317,10 @@ jobs:
           else
             TAG="${GITHUB_REF_NAME}"
           fi
-
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Invalid release tag: $TAG" >&2
             exit 1
           fi
-
           echo "TAG=$TAG" >> "$GITHUB_ENV"
 
       - name: Verify release assets
