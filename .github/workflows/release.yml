@@ -155,9 +155,14 @@ jobs:
             Out-String |
             Write-Host
 
-          $exe = Get-ChildItem -LiteralPath $root -Recurse -File -Filter '*.exe' |
-            Where-Object { $_.FullName -match '\.dist\' } |
+          $exe = Get-ChildItem -LiteralPath $root -Recurse -File -Filter "${env:APP_SLUG}-standalone.exe" |
             Select-Object -First 1
+
+          if ($null -eq $exe) {
+            $exe = Get-ChildItem -LiteralPath $root -Recurse -File -Filter '*.exe' |
+              Where-Object { $_.Directory.Name -like '*.dist' } |
+              Select-Object -First 1
+          }
 
           if ($null -eq $exe) {
             throw "No standalone executable was found under: $root"
@@ -165,19 +170,21 @@ jobs:
 
           $exePath = $exe.FullName
           $workDir = $exe.DirectoryName
-          $logPath = Join-Path $workDir 'startup.log'
+          $stdoutLog = Join-Path $workDir 'startup.stdout.log'
+          $stderrLog = Join-Path $workDir 'startup.stderr.log'
 
           Write-Host "Standalone executable: $exePath"
           Write-Host "Working directory: $workDir"
-          Write-Host "Startup log: $logPath"
+          Write-Host "Startup stdout: $stdoutLog"
+          Write-Host "Startup stderr: $stderrLog"
 
           $p = Start-Process `
             -FilePath $exePath `
             -WorkingDirectory $workDir `
             -PassThru `
             -WindowStyle Hidden `
-            -RedirectStandardOutput $logPath `
-            -RedirectStandardError $logPath
+            -RedirectStandardOutput $stdoutLog `
+            -RedirectStandardError $stderrLog
 
           Start-Sleep -Seconds 10
           $p.Refresh()
@@ -186,9 +193,13 @@ jobs:
             $exitCode = $p.ExitCode
             Write-Host "Standalone exit code: $exitCode"
 
-            if (Test-Path -LiteralPath $logPath) {
-              Write-Host '--- startup.log ---'
-              Get-Content -LiteralPath $logPath -ErrorAction SilentlyContinue | Write-Host
+            if (Test-Path -LiteralPath $stdoutLog) {
+              Write-Host '--- startup stdout ---'
+              Get-Content -LiteralPath $stdoutLog -ErrorAction SilentlyContinue | Write-Host
+            }
+            if (Test-Path -LiteralPath $stderrLog) {
+              Write-Host '--- startup stderr ---'
+              Get-Content -LiteralPath $stderrLog -ErrorAction SilentlyContinue | Write-Host
             }
 
             Write-Host '--- Windows application errors ---'
@@ -243,7 +254,8 @@ jobs:
             throw "Windows onefile executable was not found: $exe"
           }
 
-          $logPath = Join-Path $PWD 'dist\onefile-startup.log'
+          $stdoutLog = Join-Path $PWD 'dist\onefile-startup.stdout.log'
+          $stderrLog = Join-Path $PWD 'dist\onefile-startup.stderr.log'
           Write-Host "Launching onefile executable: $exe"
 
           $p = Start-Process `
@@ -251,8 +263,8 @@ jobs:
             -WorkingDirectory (Split-Path $exe) `
             -PassThru `
             -WindowStyle Hidden `
-            -RedirectStandardOutput $logPath `
-            -RedirectStandardError $logPath
+            -RedirectStandardOutput $stdoutLog `
+            -RedirectStandardError $stderrLog
 
           Start-Sleep -Seconds 10
           $p.Refresh()
@@ -260,9 +272,13 @@ jobs:
           if ($p.HasExited) {
             $exitCode = $p.ExitCode
             Write-Host "Onefile exit code: $exitCode"
-            if (Test-Path -LiteralPath $logPath) {
-              Write-Host '--- onefile startup log ---'
-              Get-Content -LiteralPath $logPath -ErrorAction SilentlyContinue | Write-Host
+            if (Test-Path -LiteralPath $stdoutLog) {
+              Write-Host '--- onefile startup stdout ---'
+              Get-Content -LiteralPath $stdoutLog -ErrorAction SilentlyContinue | Write-Host
+            }
+            if (Test-Path -LiteralPath $stderrLog) {
+              Write-Host '--- onefile startup stderr ---'
+              Get-Content -LiteralPath $stderrLog -ErrorAction SilentlyContinue | Write-Host
             }
             throw "Windows onefile executable exited during startup. ExitCode=$exitCode"
           }
