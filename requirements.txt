@@ -1,2 +1,2 @@
-PySide6==6.11.2
-polars==1.44.2
+PySide6==6.12.0
+polars==2.0.0
